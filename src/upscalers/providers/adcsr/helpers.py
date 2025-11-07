@@ -69,5 +69,5 @@ class ADCSRWrapper:
             model = nn.DataParallel(model)
         return model
 
-    def __call__(self, *args: Any, **kwds: Any) -> Any:
+    def __call__(self):
         pass
