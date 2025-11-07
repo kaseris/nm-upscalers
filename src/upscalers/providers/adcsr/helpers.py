@@ -69,5 +69,11 @@ class ADCSRWrapper:
             model = nn.DataParallel(model)
         return model
 
-    def __call__(self):
-        pass
+    def __call__(self, img: torch.Tensor) -> torch.Tensor:
+        upscaled: torch.Tensor = self.model(img)
+        upscaled = (upscaled - upscaled.mean(dim=[2, 3], keepdim=True)) / upscaled.std(
+            dim=[2, 3], keepdim=True
+        )
+        upscaled = upscaled * img.std(dim=[2, 3], keepdim=True) + img.mean(dim=[2, 3], keepdim=True)
+        return upscaled
+
