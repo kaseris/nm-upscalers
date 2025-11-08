@@ -8,4 +8,11 @@ class UpscalerSettings:
     ADCSR_MODEL_WEIGHTS_PATH = "weights/net_params_200.pkl"
 
 
+@dataclass
+class ServerSettings:
+    HOST = "0.0.0.0"
+    PORT = 8000
+
+
 upscaler_settings = UpscalerSettings()
+server_settings = ServerSettings()
