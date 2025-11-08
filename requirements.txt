@@ -4,3 +4,5 @@ torchaudio>=2.4.1
 diffusers>=0.32.2
 numpy
 pillow
+fastapi==0.121.0
+uvicorn==0.38.0
