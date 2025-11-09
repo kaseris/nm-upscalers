@@ -6,6 +6,7 @@ from diffusers import StableDiffusionPipeline
 from diffusers.models.autoencoders.vae import Decoder
 
 from src.config import upscaler_settings
+from src.upscalers.client.base_client import BaseClient
 from src.upscalers.providers.adcsr.model import Net
 
 
@@ -23,9 +24,9 @@ def build_decoder() -> Decoder:
     )
 
 
-def load_adscr_decoder_weights(path_to_decoder_weights: str, device: str = "cuda"):
+def load_adscr_decoder_weights(path_to_decoder_weights: str, device: str = "cpu"):
     ckpt_halfdecoder = torch.load(
-        "./weight/pretrained/halfDecoder.ckpt", weights_only=False, map_location=device
+        path_to_decoder_weights, weights_only=False, map_location=device
     )
     decoder_ckpt = {}
     for k, v in ckpt_halfdecoder["state_dict"].items():
@@ -35,10 +36,12 @@ def load_adscr_decoder_weights(path_to_decoder_weights: str, device: str = "cuda
     return decoder_ckpt
 
 
-class ADCSRWrapper:
-    def __init__(self, device: str = "cuda") -> None:
-        self.device = device
+class ADCSRWrapper(BaseClient):
+    def __init__(self, device: str = "cpu") -> None:
+        super().__init__(device)
+        self.logger.info(f"Initializing ADCSRWrapper with device: {device}")
         self.model = self._prepare_model()
+        self.logger.info("ADCSRWrapper initialized successfully")
 
     def _prepare_model(self):
         sdxl_pipeline = StableDiffusionPipeline.from_pretrained(
@@ -64,7 +67,7 @@ class ADCSRWrapper:
             decoder.conv_out,
         )
 
-    def _maybe_make_data_parallel(self):
+    def _maybe_make_data_parallel(self, model):
         if self.device == "cuda":
             model = nn.DataParallel(model)
         return model
@@ -74,6 +77,7 @@ class ADCSRWrapper:
         upscaled = (upscaled - upscaled.mean(dim=[2, 3], keepdim=True)) / upscaled.std(
             dim=[2, 3], keepdim=True
         )
-        upscaled = upscaled * img.std(dim=[2, 3], keepdim=True) + img.mean(dim=[2, 3], keepdim=True)
+        upscaled = upscaled * img.std(dim=[2, 3], keepdim=True) + img.mean(
+            dim=[2, 3], keepdim=True
+        )
         return upscaled
-
