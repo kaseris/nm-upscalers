@@ -30,5 +30,4 @@ async def health():
 
 if __name__ == "__main__":
     logger.info(f"Starting server on {server_settings.HOST}:{server_settings.PORT}")
-    wrapper = ADCSRWrapper()
     uvicorn.run(app, host=server_settings.HOST, port=server_settings.PORT)
