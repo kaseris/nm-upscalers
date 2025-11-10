@@ -6,4 +6,5 @@ def is_cuda_available() -> bool:
 
 
 def get_available_devices() -> list[str]:
-    return [f"cuda:{i}" for i in range(torch.cuda.device_count())]
+    if is_cuda_available():
+        return [f"cuda:{i}" for i in range(torch.cuda.device_count())]
