@@ -53,11 +53,13 @@ class ADCSRWrapper(BaseClient):
             path_to_decoder_weights=upscaler_settings.ADCSR_DECODER_WEIGHTS_PATH
         )
         decoder.load_state_dict(decoder_ckpt, strict=True)
-        upscale_model = self._maybe_make_data_parallel(
-            Net(unet=unet, decoder=copy.deepcopy(decoder))
-        )
+        upscale_model = nn.DataParallel(Net(unet=unet, decoder=copy.deepcopy(decoder)))
         upscale_model.load_state_dict(
-            torch.load(upscaler_settings.ADCSR_MODEL_WEIGHTS_PATH)
+            torch.load(
+                upscaler_settings.ADCSR_MODEL_WEIGHTS_PATH,
+                weights_only=False,
+                map_location=self.device,
+            ),
         )
         return torch.nn.Sequential(
             upscale_model.module,
