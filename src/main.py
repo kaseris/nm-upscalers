@@ -10,6 +10,7 @@ CURR_DIR = os.getcwd()
 sys.path.insert(0, CURR_DIR)
 
 from src import __version__
+from src.routes.upscale import router as upscale_router
 from src.config import server_settings
 from src.upscalers.providers.adcsr.helpers import ADCSRWrapper
 from src.logger import logger
@@ -26,6 +27,9 @@ async def root():
 async def health():
     logger.info("Health check request received")
     return "OK"
+
+
+app.include_router(upscale_router)
 
 
 if __name__ == "__main__":
