@@ -1,11 +1,16 @@
 import copy
+import io
 import torch
 import torch.nn as nn
+from PIL import Image, UnidentifiedImageError
+from torchvision import transforms
 
 from diffusers import StableDiffusionPipeline
 from diffusers.models.autoencoders.vae import Decoder
 
+
 from src.config import upscaler_settings
+from src.logger import logger
 from src.upscalers.client.base_client import BaseClient
 from src.upscalers.providers.adcsr.model import Net
 
@@ -49,18 +54,31 @@ class ADCSRWrapper(BaseClient):
         )
         unet = sdxl_pipeline.unet
         decoder = build_decoder()
-        decoder_ckpt = load_adscr_decoder_weights(
-            path_to_decoder_weights=upscaler_settings.ADCSR_DECODER_WEIGHTS_PATH
-        )
-        decoder.load_state_dict(decoder_ckpt, strict=True)
+
+        try:
+            decoder_ckpt = load_adscr_decoder_weights(
+                path_to_decoder_weights=upscaler_settings.ADCSR_DECODER_WEIGHTS_PATH
+            )
+            self.logger.info("Decoder weights loaded successfully")
+
+            decoder.load_state_dict(decoder_ckpt, strict=True)
+        except Exception as e:
+            logger.error(f"Could not load decoder weights.")
+
         upscale_model = nn.DataParallel(Net(unet=unet, decoder=copy.deepcopy(decoder)))
-        upscale_model.load_state_dict(
-            torch.load(
-                upscaler_settings.ADCSR_MODEL_WEIGHTS_PATH,
-                weights_only=False,
-                map_location=self.device,
-            ),
-        )
+
+        try:
+            upscale_model.load_state_dict(
+                torch.load(
+                    upscaler_settings.ADCSR_MODEL_WEIGHTS_PATH,
+                    weights_only=False,
+                    map_location=self.device,
+                ),
+            )
+            self.logger.info("ADCSR Model weights loaded successfully")
+        except Exception as e:
+            self.logger.error("Could not load ADCSR model weights.")
+
         return torch.nn.Sequential(
             upscale_model.module,
             *decoder.up_blocks,
@@ -75,7 +93,9 @@ class ADCSRWrapper(BaseClient):
         return model
 
     def __call__(self, img: torch.Tensor) -> torch.Tensor:
+        logger.info("Starting upscaling process with ADCSR")
         upscaled: torch.Tensor = self.model(img)
+        logger.info("Upscaling finished")
         upscaled = (upscaled - upscaled.mean(dim=[2, 3], keepdim=True)) / upscaled.std(
             dim=[2, 3], keepdim=True
         )
@@ -83,3 +103,34 @@ class ADCSRWrapper(BaseClient):
             dim=[2, 3], keepdim=True
         )
         return upscaled
+
+
+def image_bytes_to_tensor(data: bytes, device: str = "cpu") -> torch.Tensor:
+    try:
+        img = Image.open(io.BytesIO(data)).convert("RGB")
+        logger.info("Image read successfully.")
+    except UnidentifiedImageError as e:
+        raise ValueError("Unable to decode image bytes") from e
+
+    tensor = transforms.ToTensor()(img).to(device=device, dtype=torch.float32)
+    tensor = tensor.unsqueeze(0)
+    tensor = tensor * 2 - 1
+    logger.info(f"Image shape: {tensor.shape}")
+    return tensor
+
+
+def tensor_to_image_bytes(tensor: torch.Tensor, image_format: str = "PNG") -> bytes:
+    """Convert a tensor in [-1,1] to encoded image bytes.
+
+    Accepts [B,3,H,W] or [3,H,W] tensor. Returns bytes encoded as PNG by default.
+    """
+    if tensor.dim() == 4:
+        tensor = tensor[0]
+    if tensor.dim() != 3 or tensor.size(0) != 3:
+        raise ValueError("Expected a tensor with shape [3,H,W] or [1,3,H,W]")
+
+    img_01 = (tensor / 2 + 0.5).clamp(0, 1).detach().cpu()
+    pil_img = transforms.ToPILImage()(img_01)
+    buf = io.BytesIO()
+    pil_img.save(buf, format=image_format)
+    return buf.getvalue()
