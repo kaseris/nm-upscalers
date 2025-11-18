@@ -55,6 +55,8 @@ class ADCSRWrapper(BaseClient):
                 upscaler_settings.ADCSR_SDXL_MODEL_NAME
             )
             unet = sdxl_pipeline.unet
+            if self.device == "cuda":
+                unet = unet.to(self.device)
         except Exception as e:
             self.logger.error(f"An error occured while loading unet: {e}")
         decoder = build_decoder()
@@ -91,7 +93,7 @@ class ADCSRWrapper(BaseClient):
             decoder.conv_norm_out,
             decoder.conv_act,
             decoder.conv_out,
-        )
+        ).to(self.device)
 
     def _maybe_make_data_parallel(self, model):
         if self.device == "cuda":
@@ -100,6 +102,7 @@ class ADCSRWrapper(BaseClient):
 
     def __call__(self, img: torch.Tensor) -> torch.Tensor:
         logger.info("Starting upscaling process with ADCSR")
+        img = img.to(self.device)
         upscaled: torch.Tensor = self.model(img)
         logger.info("Upscaling finished")
         upscaled = (upscaled - upscaled.mean(dim=[2, 3], keepdim=True)) / upscaled.std(

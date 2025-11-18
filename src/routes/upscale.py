@@ -46,8 +46,8 @@ async def upscale(
     try:
         with torch.inference_mode():
             sr = _adcsr_upscaler(tensor)
-    except Exception:
-        logger.error("Upscaling failed")
+    except Exception as e:
+        logger.error(f"Upscaling failed: {e}")
         raise HTTPException(status_code=500, detail="Upscaling failed")
 
     try:
