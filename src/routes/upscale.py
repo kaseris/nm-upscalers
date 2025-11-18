@@ -38,7 +38,7 @@ async def upscale(
     global _adcsr_upscaler
     if _adcsr_upscaler is None:
         try:
-            _adcsr_upscaler = ADCSRWrapper()
+            _adcsr_upscaler = ADCSRWrapper(device="cuda")
         except Exception:
             logger.error("Failed to initialize ADCSRWrapper")
             raise HTTPException(status_code=500, detail="Failed to initialize upscaler")

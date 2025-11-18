@@ -49,23 +49,29 @@ class ADCSRWrapper(BaseClient):
         self.logger.info("ADCSRWrapper initialized successfully")
 
     def _prepare_model(self):
-        sdxl_pipeline = StableDiffusionPipeline.from_pretrained(
-            upscaler_settings.ADCSR_SDXL_MODEL_NAME
-        )
-        unet = sdxl_pipeline.unet
+        try:
+            self.logger.info(f"Loading pipeline: {upscaler_settings.ADCSR_SDXL_MODEL_NAME}")
+            sdxl_pipeline = StableDiffusionPipeline.from_pretrained(
+                upscaler_settings.ADCSR_SDXL_MODEL_NAME
+            )
+            unet = sdxl_pipeline.unet
+        except Exception as e:
+            self.logger.error(f"An error occured while loading unet: {e}")
         decoder = build_decoder()
 
         try:
             decoder_ckpt = load_adscr_decoder_weights(
                 path_to_decoder_weights=upscaler_settings.ADCSR_DECODER_WEIGHTS_PATH
             )
-            self.logger.info("Decoder weights loaded successfully")
-
             decoder.load_state_dict(decoder_ckpt, strict=True)
+            self.logger.info("Decoder weights loaded successfully")
         except Exception as e:
             logger.error(f"Could not load decoder weights.")
 
-        upscale_model = nn.DataParallel(Net(unet=unet, decoder=copy.deepcopy(decoder)))
+        try:
+            upscale_model = nn.DataParallel(Net(unet=unet, decoder=copy.deepcopy(decoder)))
+        except Exception as e:
+            self.logger.error(f"An error occured while instantiating the model: {e}")
 
         try:
             upscale_model.load_state_dict(
